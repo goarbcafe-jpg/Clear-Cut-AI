@@ -1,0 +1,808 @@
+# Complete implementation blueprint: Professional AI Background Remover
+
+
+
+Mobile-first development
+
+Free-to-start architecture
+
+
+
+Your goal is to build a professional AI Background Remover that works like a real photo-editing application on Android phones, not just a website with an upload button.
+
+I recommend building it under an original brand, with:
+
+- Professional AI background removal.
+- Fine hair and edge detection.
+- Touchscreen editing studio.
+- Erase and restore brushes.
+- Transparent PNG export.
+- Custom background replacement.
+- Professional product and portrait editing.
+- User accounts and project history.
+- Real backend and database.
+- A foundation for future premium features.
+
+## 1. First, choose the right architecture
+
+One important technical decision: Google AI Studio should be your AI-assisted development environment, not your background-removal engine.
+
+Your actual application needs a separate image-processing model and backend.
+
+## Your application architecture
+
+Android-first mobile application
+
+Installable PWA · Touch editor · Responsive interface
+
+Backend and authentication
+
+Firebase / Cloud Functions or secure API
+
+AI engine
+
+Background segmentation and matting
+
+Database
+
+Users, projects and processing jobs
+
+Processed transparent images
+
+PNG · WebP · JPG · Download and share
+
+## 2. Mobile platform decision: native Android or PWA?
+
+Google AI Studio now supports both native Android development with Kotlin/Jetpack Compose and full-stack web application development with React and Node.js. However, the native Android environment is client-side, whereas the web environment supports a server-side runtime.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://ai.google.dev\&sz=32)
+
+Google AI for Developers
+
++1
+
+
+
+For your professional editor, I recommend:
+
+Recommended starting approach
+
+Best starting route
+
+# Mobile-first web app
+
+- Develop using React + TypeScript in Google AI Studio.
+- Make it installable on Android as a PWA.
+- Use Firebase for accounts and project data.
+- Use browser-based AI inference for the first working background-removal engine.
+- Add a server-hosted AI model when you have access to suitable compute.
+- Later, create a native Android version if needed.
+
+This gives you a real backend and a powerful editing interface without maintaining two separate applications from the beginning.
+
+## 3. Technology stack and free-start strategy
+
+| Component        | Recommended choice       | Purpose              |
+| ---------------- | ------------------------ | -------------------- |
+| Development      | Google AI Studio         | AI-assisted coding   |
+| Frontend         | React + TypeScript       | Mobile UI            |
+| Styling          | Tailwind CSS             | Design               |
+| Editor canvas    | HTML Canvas              | Touch editing        |
+| Touch input      | Pointer Events           | Finger/stylus/mouse  |
+| Database         | Firebase Firestore       | User projects        |
+| Authentication   | Firebase Auth            | Google sign-in       |
+| AI engine v1     | MediaPipe                | Browser segmentation |
+| AI engine v2     | BiRefNet adapter         | Advanced cutouts     |
+| Image processing | Canvas / Web Workers     | Masks and PNG export |
+| Native future    | Kotlin / Jetpack Compose | Android APK          |
+
+Important distinction about free usage:
+
+- Firebase has a no-cost Spark plan, with service-specific limitations.&#x20;
+
+  [image](https://www.google.com/s2/favicons?domain=https://support.google.com\&sz=32)
+
+  Firebase Help
+
+  +1
+
+- MediaPipe can run image segmentation in the browser, avoiding an inference server for the initial engine.&#x20;
+
+  [image](https://www.google.com/s2/favicons?domain=https://developers.google.com\&sz=32)
+
+  Google for Developers
+
+- A high-quality server-hosted AI model requires computing resources. Do not assume unlimited free GPU hosting.
+
+- Google AI Studio and Cloud Run deployment availability and quotas are separate considerations.&#x20;
+
+  [image](https://www.google.com/s2/favicons?domain=https://ai.google.dev\&sz=32)
+
+  Google AI for Developers
+
+
+
+Start with free local processing and avoid paid API dependencies until your core application works.
+
+## 4. Real AI background removal: the most important part
+
+I recommend a two-engine approach.
+
+[Hintergrund Entfernen: Beste Kostenlose Tools (2026)](https://images.openai.com/static-rsc-4/_60wnpt8WikfTdS2rjNfEvp9IvDhOM7SgdK-XNhlnv-zw4yjCc4jeezgC9CUPAkhIU7_A2C7IUcUN6m5wqD0r1QMES7FpEF7TRtFmA0SD4iv-y2Wot8I4rVuaZyiDoqlr4D3ulmVoyvqgPjD-Ro8WAJ5SuuQcwFq4V087st6EZQ?purpose=inline)
+
+Engine A: MediaPipe Selfie Segmentation
+
+Free-start / on-device
+
+- Detect people.
+- Separate person and background.
+- Run locally on the phone.
+- Use additional hair segmentation for refinement.
+
+[Make a Transparent Background PNG — PixEdit Blog | PixEdit](https://images.openai.com/static-rsc-4/Nkp_xRmvDzLkhYOPegHdDTKdEAfHoKxIshbgfmi75NSPWUWjWwYy_zDdH3jrbtL8-PZlls-PgyTBIrTarY8Efb0aOhBJ7ji2f1m9JaNyTFMeGj050SIMbh7DlS-FYaTeOkgiLyQimlT5uvSA4Myy8Ks-erJJ4AndR2az9tYlm7M?purpose=inline)
+
+Engine B: Interactive object segmentation
+
+- Select an object by tapping or drawing a stroke.
+- Generate an object mask.
+- Allow adding and removing selected areas.
+- Support product and general-object workflows.
+
+MediaPipe provides dedicated person, hair and multi-class segmentation models. Its interactive segmentation task also supports selecting an object using user-provided points or strokes.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://developers.google.com\&sz=32)
+
+Google for Developers
+
++1
+
+
+
+Why not use only one model?
+
+Because a model optimised for portraits is not necessarily good at separating shoes, furniture, bottles, cars or other products.
+
+Your app should intelligently choose the correct engine:
+
+| Uploaded image      | Processing engine                         |
+| ------------------- | ----------------------------------------- |
+| Human portrait      | Selfie segmentation                       |
+| Hair-heavy portrait | Person + hair refinement                  |
+| Product image       | Interactive object segmentation           |
+| Multiple objects    | Interactive selection + manual refinement |
+| Difficult image     | Manual erase/restore fallback             |
+
+For a later high-quality server engine, evaluate BiRefNet and its appropriate variants. It is a potential advanced model, but you will need model hosting, hardware and licence verification before commercial deployment.
+
+The quality rule: Always preserve the original-resolution image and apply the generated mask to that image. Never export only the small resized preview used for AI inference.
+
+## 5. Database design
+
+Use Firebase Firestore initially.
+
+Your database should have the following structure:
+
+| Collection     | Information                      |
+| -------------- | -------------------------------- |
+| users          | User profile and settings        |
+| projects       | Project name, owner, timestamps  |
+| images         | Original dimensions and metadata |
+| processingJobs | Status, engine, errors, duration |
+| editSessions   | Brush and background settings    |
+| subscriptions  | Plan and subscription status     |
+| usage          | Processing and export counts     |
+
+Example project record:
+
+```
+{
+  "projectId": "project_001",
+  "userId": "authenticated_user_id",
+  "name": "Product Photo",
+  "originalWidth": 4000,
+  "originalHeight": 3000,
+  "engine": "mediapipe",
+  "status": "completed",
+  "exportFormat": "png",
+  "createdAt": "server_timestamp"
+}
+```
+
+This is a suggested schema, not a record you need to enter manually.
+
+Privacy and security rules:
+
+- Users can access only their own projects.
+- Never trust a user ID supplied by the client without authentication.
+- Validate every upload.
+- Keep private images private.
+- Do not store API secrets in the APK.
+- Add account and image deletion.
+- Avoid storing original images permanently unless the user chooses to save them.
+
+# 6. Complete application screen design
+
+Your app should have five primary navigation sections.
+
+[BG Remover - Mobile App by Numan Randhawa. on Dribbble](https://images.openai.com/static-rsc-4/fu-9thzuDVYk7yH89eQytdkPFQ-ucPrFlWNHLyWS1HYNAWt2RL4krfeAQOTmQvGBpBzkv7VAwRiUIO70zmOK7gK_Zr3mJJfU0BxsdZ5NruAy9ER_sKpCLzC9X_DEJrlKnpCO780xJAjk1JWsV_pv9ycuq8ifRjipOVXxzNOKqLI?purpose=inline)
+
+1\. Home
+
+Upload, recent projects, quick tools.
+
+[Phocus: 인물 DSLR 카메라 - 사진 및 비디오 앱 | MWM](https://images.openai.com/static-rsc-4/v-F8fB8STk24jDKeliC1jo8jPMnU9OyoSAjGsisGVWLeqyLd8Tdxlo60OlCCsuzsYjYmwUreoWRZlARBrQ9VQu5cwOM43B-YB23q-GE_P0BuGCakz4mNQOfaD7S-QRihj2sB5xI0gucQVbsmUgRz31uNVzbd-SG6DvKNZMXkz-s?purpose=inline)
+
+2\. Editor
+
+Canvas, brush, background and layers.
+
+[Travel Image Generator: How to Make Fake Travel Photos with AI](https://images.openai.com/static-rsc-4/zZ7g2g5w5ci_Wiq4XtoSJrPT_toMJZVo0boSTWueZYjjrYpBIVWKvsKjQQjFsbsfAXdn0j3jkyEWZS5SHe394lbbeljo_eGlug_BaeGZ90zdB6-iBGVzuVYzDvSyjEm9d20uSInXOGeR8FUH1Hn3pWrGy6gy940qYx5jhh5GzCQ?purpose=inline)
+
+3\. AI Studio
+
+Backgrounds, enhancement and effects.
+
+[Modelfy - AI Product Photography for E-commerce](https://images.openai.com/static-rsc-4/vSC5wsyqsTHDtOwrHma_tVx5l3-nOfP4PpbB5imburJq4oHo9h12SHENKeZgTK3WN1Eiz6Uk0h7jeIrUX9wj1TaYhA2SoRK4RHNqm0YcSciXjSpAGPVyQgAL07eN6s2ym2Hf9UNNzhAoYEfZpj9WIpFvhWbLWDW_v9PfY7vs1wA?purpose=inline)
+
+4\. Projects
+
+Saved images and editing history.
+
+The fifth section is Profile — account, settings, storage and app information.
+
+### Professional editor layout
+
+[Las 10 mejores apps para quitar fondo a una imagen con IA](https://images.openai.com/static-rsc-4/NIGUHDeVJLvCOFuAYdGHeFNNRsyne_wwtjfS8cfEio5rV01DRHkjkb3FhjXdHZo7cR6b7n1e69w-Sy97tkUL9WWh2mg8m_F4EL0va0bYjQ_ahTGNVKvX_sERnPUQCJucsgcTF3GiUrMCxdt0R_cGbZEan7jcd7B32TVY8F-RVQQ?purpose=inline)
+
+[perfectcorp.com](https://www.perfectcorp.com/es/consumer/blog/photo-editing/apps-para-quitar-fondo-gratis?utm_source=chatgpt.com)
+
+Your editing workspace should have:
+
+1. Top toolbar: Back, Undo, Redo, Compare, Export.
+2. Main canvas: Transparent checkerboard with the subject.
+3. Floating controls: Zoom, fit, reset.
+4. Bottom tools: Erase, Restore, Select, Background, Shadow.
+5. Expandable tool panel: Brush size, softness, opacity and feather.
+6. Export panel: Transparent PNG, JPG, WebP and image quality.
+
+# 7. Step-by-step Google AI Studio build prompts
+
+Now the actual development process. Use these prompts one at a time, in the same Google AI Studio project. Do not paste all of them together.
+
+Open [Google AI Studio](https://aistudio.google.com/?utm_source=chatgpt.com) → Build → select Android from the platform picker.
+
+Recommended build sequence
+
+## Prompt 1 — Create the complete Android application
+
+Create a premium native Android AI Background Remover application using Kotlin and Jetpack Compose.
+
+PRODUCT VISION:\
+Build a professional mobile image editing application with the quality and usability of a commercial photo editing product.
+
+DESIGN:
+
+- Minimal premium professional interface.
+- Modern dark theme with optional light theme.
+- Black/charcoal surfaces with subtle accent colour.
+- Beautiful typography and consistent spacing.
+- Smooth, lightweight animations.
+- Rounded but professional controls.
+- No unnecessary gradients or decorative elements.
+
+BOTTOM NAVIGATION:
+
+1. Home
+2. Editor
+3. AI Studio
+4. Projects
+5. Profile
+
+HOME SCREEN:
+
+- Premium application header.
+- Large image upload card.
+- Import from gallery.
+- Import using camera.
+- Recent projects.
+- Quick access to background removal.
+- Supported file format information.
+
+EDITOR SCREEN:
+
+- Dedicated full-screen editing workspace.
+- Transparent checkerboard canvas.
+- Top toolbar.
+- Bottom editing toolbar.
+- Floating zoom controls.
+- Expandable settings panel.
+- Undo and redo.
+- Before/after comparison.
+- Export button.
+
+TECHNICAL REQUIREMENTS:
+
+- Kotlin.
+- Jetpack Compose.
+- Material 3.
+- Navigation Compose.
+- MVVM architecture.
+- Repository pattern.
+- Dependency injection where appropriate.
+- Coroutines and Flow.
+- Proper state management.
+- Separate UI, domain and data layers.
+
+Create reusable components and a clean project structure.
+
+IMPORTANT:\
+Do not build fake buttons or simulated processing. Create the complete UI foundation with functional navigation and real interaction states. Keep AI processing and database integration modular so they can be added in subsequent development stages.
+
+## Prompt 2 — Real AI background removal engine
+
+Implement REAL on-device AI background removal in my existing Android application.
+
+Use Google's MediaPipe Tasks Vision ImageSegmenter with suitable officially supported segmentation models.
+
+ENGINE REQUIREMENTS:
+
+1. Person segmentation:
+
+- Integrate the MediaPipe SelfieSegmenter model.
+- Detect the person.
+- Generate a confidence-based foreground mask.
+- Separate foreground from background.
+
+2. Hair refinement:
+
+- Integrate the MediaPipe HairSegmenter where compatible.
+- Preserve fine hair and natural edges.
+- Combine masks using appropriate confidence-based processing.
+- Avoid unwanted background halos.
+
+3. General object selection:
+
+- Integrate MediaPipe Interactive Image Segmenter using a compatible MagicTouch model.
+- Allow users to tap or draw strokes over the object they want to keep.
+- Generate an object-selection mask.
+- Support additional positive and negative selections.
+
+4. AI ENGINE ARCHITECTURE:\
+   Create an ImageSegmentationEngine interface.\
+   Implement separate person and interactive-object segmentation engines.\
+   Create a model-selection service.\
+   Allow future model replacement without rewriting the editor.
+5. IMAGE PROCESSING:
+
+- Read original image dimensions.
+- Correct image orientation using EXIF metadata.
+- Preprocess images for model input.
+- Run inference off the UI thread.
+- Return the segmentation mask.
+- Map the mask back to original image dimensions.
+- Apply the mask to the original-resolution image.
+- Preserve transparent alpha values.
+- Handle processing errors and memory limitations.
+
+6. USER EXPERIENCE:
+
+- Actual processing progress.
+- Loading and error states.
+- Cancel supported operations.
+- Retry failed operations.
+- Preview the actual result.
+
+7. EXPORT:
+
+- Export real transparent PNG files.
+- Preserve alpha transparency.
+- Do not replace transparency with white.
+- Preserve the highest practical original resolution.
+
+Do not use Gemini image generation as a substitute for segmentation.\
+Do not use a fake pre-generated result.\
+Do not claim object detection works for arbitrary objects unless the selected model supports it.
+
+First verify model compatibility, dependency versions and model asset licensing. Then implement and test each engine separately.
+
+Deliver working Kotlin code, model asset configuration, required dependencies and an explanation of the actual model limitations.
+
+## Prompt 3 — Professional touchscreen editor
+
+Upgrade my existing Android application into a professional touchscreen image editing studio.
+
+The editor must operate on the actual original image and its segmentation mask.
+
+TOUCH GESTURES:
+
+- One-finger drawing for brushes.
+- Two-finger pinch-to-zoom.
+- Two-finger pan.
+- Two-finger rotation when enabled.
+- Double-tap to reset zoom.
+- Smooth touch tracking.
+- Correct coordinate transformation between screen, canvas and original image coordinates.
+
+EDITING TOOLS:
+
+1. Erase brush:\
+   Remove selected foreground pixels from the mask.
+2. Restore brush:\
+   Restore foreground pixels.
+3. Smart selection:\
+   Use the interactive segmentation model to improve object selection.
+4. Hair refinement:\
+   Refine the existing mask around fine hair regions.
+5. Edge refinement:\
+   Add feathering, smoothing, edge contraction and softness controls.
+
+BRUSH SETTINGS:
+
+- Brush size.
+- Hardness.
+- Opacity.
+- Feather.
+- Adjustable zoom.
+
+EDITOR CONTROLS:
+
+- Undo.
+- Redo.
+- Reset.
+- Before/after comparison.
+- Zoom percentage.
+- Fit to screen.
+- Original size.
+
+PERFORMANCE:
+
+- Do not run AI inference for every brush movement.
+- Use efficient mask updates.
+- Use separate background processing for expensive operations.
+- Avoid unnecessary bitmap copies.
+- Maintain smooth canvas interactions.
+- Support low-memory Android devices.
+
+Implement functional controls rather than visual-only buttons.
+
+Test every gesture and editing operation on a real Android touchscreen.
+
+## Prompt 4 — Background replacement and professional tools
+
+Implement professional background editing in the existing image editor.
+
+FEATURES:
+
+1. Transparent background.
+2. Solid colour backgrounds.
+3. Custom gradient backgrounds.
+4. Import background from gallery.
+5. Built-in background presets.
+6. Background blur.
+7. Subject positioning.
+8. Subject resizing.
+9. Subject rotation.
+10. Realistic drop shadow.
+11. Shadow blur, angle, distance and opacity.
+12. Background cropping and resizing.
+
+PRESETS:
+
+- Pure white studio.
+- Black studio.
+- Professional grey.
+- Soft pastel.
+- Gradient studio.
+- E-commerce white.
+- Professional portrait.
+- Natural outdoor.
+- Office environment.
+
+Implement a layer-based composition system:
+
+- Original foreground.
+- Editable foreground mask.
+- Background layer.
+- Shadow layer.
+- Optional overlay layer.
+
+Keep the foreground mask editable even after changing the background.
+
+Add an instant preview and reliable undo/redo.
+
+Do not flatten the layers until final export.
+
+## Prompt 5 — Firebase backend and user accounts
+
+Connect my existing Android AI Background Remover application to Firebase.
+
+Use Google AI Studio's supported Firebase integration to configure:
+
+- Firebase Authentication.
+- Google Sign-In.
+- Cloud Firestore.
+- Firestore Security Rules.
+
+Create user profiles, project metadata, image metadata, processing history and saved editing settings.
+
+DATABASE STRUCTURE:
+
+users:
+
+- userId
+- displayName
+- email
+- createdAt
+- preferences
+
+projects:
+
+- projectId
+- userId
+- projectName
+- originalWidth
+- originalHeight
+- createdAt
+- updatedAt
+- projectStatus
+
+processingJobs:
+
+- jobId
+- userId
+- projectId
+- engineName
+- processingStatus
+- processingDuration
+- errorMessage
+
+editSessions:
+
+- sessionId
+- userId
+- projectId
+- backgroundSettings
+- brushSettings
+- maskVersion
+- updatedAt
+
+SECURITY:
+
+- Require authentication for private projects.
+- Restrict access to each user's own records.
+- Validate ownership server-side or through Firestore Security Rules.
+- Never trust user IDs supplied without authentication.
+- Prevent unauthorized database writes.
+- Do not store API secrets in the application.
+- Add secure sign-out and account deletion.
+
+For the free-first version, keep image processing on-device and store project metadata in Firestore. Keep original images and temporary masks locally unless the user explicitly enables cloud saving.
+
+Verify the generated Firebase Security Rules and test access with two separate accounts.
+
+## Prompt 6 — Save projects and export images
+
+Implement a complete project-saving and image-export system.
+
+LOCAL PROJECT STORAGE:
+
+- Save original image references where accessible.
+- Save edited mask data.
+- Save background settings.
+- Save foreground transformations.
+- Save editing history.
+- Save project thumbnails.
+- Restore editing sessions.
+
+EXPORT FORMATS:
+
+- PNG with transparent background.
+- PNG with custom background.
+- JPG.
+- WebP where supported.
+
+EXPORT SETTINGS:
+
+- Original resolution.
+- Custom dimensions.
+- Image quality.
+- Transparent background toggle.
+- File name.
+- Destination folder.
+
+IMPORTANT:
+
+- Transparent PNG must contain a real alpha channel.
+- JPG must automatically use a selected background because JPG does not support transparency.
+- Do not export low-resolution preview images.
+- Handle Android storage permissions using modern Android APIs and the system photo picker.
+- Display success and failure messages.
+- Provide a share option.
+- Ensure saved files can be opened by other gallery and photo-editing applications.
+
+Add project autosaving with recovery after application restart.
+
+## Prompt 7 — Add advanced AI features
+
+Extend the application with optional advanced AI tools without breaking the existing background removal engine.
+
+Implement the following modular features:
+
+1. AI portrait enhancement.
+2. AI product photo studio.
+3. AI background generation from text prompts.
+4. AI object removal.
+5. AI image upscaling.
+6. AI lighting adjustment.
+7. AI shadow generation.
+8. AI background expansion.
+
+IMPORTANT ARCHITECTURE:
+
+- Create a separate service adapter for each AI feature.
+- Use actual compatible AI models or APIs.
+- Keep model configurations separate.
+- Store credentials only in secure server-side environments or approved Firebase AI Logic integrations.
+- Never expose private API keys in Android code.
+- Show unavailable features honestly when an API or model is not configured.
+- Add processing states, error messages and retry support.
+- Keep the core background remover fully functional without optional paid services.
+
+Prioritise features that can operate locally before adding external AI services.
+
+## Prompt 8 — Professional testing and bug fixing
+
+Perform a complete technical audit of my Android AI Background Remover application.
+
+Do not redesign the application or remove working features.
+
+TEST THE FOLLOWING:
+
+1. Image import from gallery.
+2. Image import from camera.
+3. EXIF orientation.
+4. Portrait segmentation.
+5. Hair segmentation.
+6. Interactive object selection.
+7. Mask accuracy.
+8. Original-resolution export.
+9. Transparent PNG alpha channel.
+10. Erase brush.
+11. Restore brush.
+12. Undo and redo.
+13. Pinch-to-zoom.
+14. Two-finger pan.
+15. Brush coordinate accuracy after zooming.
+16. Background replacement.
+17. Shadow rendering.
+18. Project saving.
+19. Project restoration after app restart.
+20. Google Sign-In.
+21. Firestore access permissions.
+22. Offline functionality.
+23. Low-memory handling.
+24. Processing cancellation and retries.
+25. Export and share functionality.
+
+TEST IMAGE TYPES:
+
+- Person with long hair.
+- Person with curly hair.
+- Person wearing glasses.
+- Person against a complex background.
+- White product against a white background.
+- Transparent-looking glass bottle.
+- Shoes and bags.
+- Multiple people.
+- Low-resolution photo.
+- High-resolution photo.
+
+REQUIREMENTS:
+
+- Fix actual errors.
+- Remove fake success states.
+- Remove non-functional controls.
+- Fix crashes and memory leaks.
+- Test on real Android devices.
+- Provide a list of passed tests and failed tests.
+- Report unresolved bugs.
+- Never mark a feature as complete without verification.
+
+Preserve the existing project architecture and working functionality.
+
+# 8. Testing checklist before launching
+
+You should test these features yourself on your Android phone.
+
+Android launch readiness
+
+0/19 passed
+
+Application opens without crashing
+
+Gallery upload works
+
+Camera upload works
+
+Person background removal works
+
+Hair edges are reasonably preserved
+
+Object selection works
+
+Erase brush works
+
+Restore brush works
+
+Pinch-to-zoom works
+
+Brush remains accurate after zooming
+
+Undo and redo work
+
+Background replacement works
+
+Transparent PNG opens correctly
+
+Original resolution is preserved
+
+Project saves and restores
+
+Google login works
+
+Users cannot access another user's projects
+
+Offline editing works
+
+Export and share work
+
+Only mark items after testing them.
+
+Reset
+
+# 9. Free-start infrastructure and future costs
+
+| Service             | Starting approach                                    |
+| ------------------- | ---------------------------------------------------- |
+| Google AI Studio    | Free available development access, subject to limits |
+| Android development | Build and test locally                               |
+| MediaPipe           | On-device inference                                  |
+| Firebase Auth       | Spark no-cost tier                                   |
+| Firestore           | Spark no-cost quota                                  |
+| Local image storage | Android device                                       |
+| Advanced GPU AI     | Add later                                            |
+| Cloud image storage | Add when needed                                      |
+| Payments            | Add when launching commercially                      |
+
+Check the current limits before deploying. Firebase Spark does not include every paid infrastructure service, and some deployment options require billing.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://firebase.google.com\&sz=32)
+
+Firebase
+
++1
+
+
+
+# 10. Your first development session
+
+Follow this exact sequence:
+
+1. Open Google AI Studio.
+2. Select Build.
+3. Choose Android.
+4. Paste Prompt 1.
+5. Let it generate the application.
+6. Test navigation and the UI in the emulator.
+7. Paste Prompt 2 and implement the real AI model.
+8. Test portrait segmentation before moving to the editor.
+9. Continue with Prompts 3–8 individually.
+
+Official technical references:
+
+- [Google AI Studio Android development](https://ai.google.dev/gemini-api/docs/aistudio-android?utm_source=chatgpt.com)
+- [Firebase integration with AI Studio](https://firebase.google.com/docs/ai-assistance/ai-studio-integration?utm_source=chatgpt.com)
+- [MediaPipe Android Image Segmenter](https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter/android?utm_source=chatgpt.com)
+- [Interactive object segmentation for Android](https://developers.google.com/edge/mediapipe/solutions/vision/interactive_segmenter/android?utm_source=chatgpt.com)
+
+My final recommendation: Do not start with AI background generation, subscriptions or dozens of extra tools. First achieve three things: exceptionally reliable person removal, accurate object selection and a smooth touchscreen editor. That is the foundation of a product people will actually want to use.

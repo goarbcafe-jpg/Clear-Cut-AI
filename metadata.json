@@ -1,0 +1,6 @@
+{
+  "name": "AuraCut AI - Full-Stack Background Remover & Studio",
+  "description": "Professional full-stack AI background remover with edge-preserving cutout engine, batch processing, Cloudinary cloud sync, offline support, user auth, and creative studio effects.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

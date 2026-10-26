@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AuraCut AI - Full-Stack Background Remover & Studio</title>
+    <meta name="description" content="Professional full-stack AI background remover with edge-preserving cutout engine, batch processing, Cloudinary cloud sync, offline support, user auth, and creative studio effects." />
+    <meta property="og:title" content="AuraCut AI - Full-Stack Background Remover & Studio" />
+    <meta property="og:description" content="Professional full-stack AI background remover with edge-preserving cutout engine, batch processing, Cloudinary cloud sync, offline support, user auth, and creative studio effects." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0f172a" />
+    <script>
+      // Synchronous theme initialization to avoid flash
+      try {
+        const storedTheme = localStorage.getItem('auracut_theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (storedTheme === 'dark' || (!storedTheme && prefersDark) || storedTheme === 'system' && prefersDark) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {}
+    </script>
+  </head>
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-screen font-['Plus_Jakarta_Sans',sans-serif] antialiased selection:bg-indigo-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

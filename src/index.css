@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  * {
+    border-color: var(--color-slate-200);
+  }
+
+  .dark * {
+    border-color: var(--color-slate-800);
+  }
+}
+
+/* Custom scrollbars for studio */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.5);
+}
