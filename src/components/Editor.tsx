@@ -4,6 +4,7 @@ import {
   Share2,
   Cloud,
   Sparkles,
+  Star,
   Sliders,
   Paintbrush,
   RotateCcw,
@@ -16,6 +17,7 @@ import {
   Image as ImageIcon,
   Eraser,
   Undo2,
+  Redo2,
   BookmarkCheck,
   Palette,
   Layers,
@@ -34,6 +36,9 @@ import {
   CheckCheck,
   Lock,
   Unlock,
+  Keyboard,
+  X,
+  Trash2,
 } from 'lucide-react';
 import { BackgroundConfig, EffectsConfig, ExportConfig, ImageItem } from '../types';
 import {
@@ -49,6 +54,7 @@ import {
   cropImage,
 } from '../utils/canvasEffects';
 import { loadImage, removeBackgroundLocally } from '../utils/aiSegmentation';
+import { useKeyboardShortcuts } from '../utils/useKeyboardShortcuts';
 
 interface EditorProps {
   image: ImageItem;
@@ -64,6 +70,7 @@ interface EditorProps {
   onOpenShare: (dataUrl: string, originalUrl: string) => void;
   isOnline: boolean;
   onOpenTutorial: () => void;
+  onOpenFeedback?: () => void;
 }
 
 export const Editor: React.FC<EditorProps> = ({
@@ -74,6 +81,7 @@ export const Editor: React.FC<EditorProps> = ({
   onOpenShare,
   isOnline,
   onOpenTutorial,
+  onOpenFeedback,
 }) => {
   // View Modes: 'slider' | 'cutout' | 'original' | 'mask'
   const [viewMode, setViewMode] = useState<'slider' | 'cutout' | 'original' | 'mask'>('slider');
@@ -131,12 +139,20 @@ export const Editor: React.FC<EditorProps> = ({
     dimensionPreset: 'original',
   });
 
-  // Fine-tuning touchup brush state
+  // Refinement Eraser & Fine-tuning touchup brush state with dual Undo/Redo stack
   const [isBrushMode, setIsBrushMode] = useState(false);
   const [brushAction, setBrushAction] = useState<'erase' | 'restore'>('erase');
-  const [brushSize, setBrushSize] = useState(25);
+  const [brushSize, setBrushSize] = useState(28);
+  const [brushHardness, setBrushHardness] = useState(85); // 0 = soft/feathered, 100 = crisp edge
+  const [brushOpacity, setBrushOpacity] = useState(100); // 10% to 100%
   const [isDrawing, setIsDrawing] = useState(false);
-  const [brushHistory, setBrushHistory] = useState<string[]>([]);
+  const [brushUndoStack, setBrushUndoStack] = useState<string[]>([]);
+  const [brushRedoStack, setBrushRedoStack] = useState<string[]>([]);
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number; visible: boolean }>({
+    x: 0,
+    y: 0,
+    visible: false,
+  });
 
   // Engine & Reprocessing
   const [activeEngine, setActiveEngine] = useState<'neural' | 'fast'>(
@@ -167,6 +183,77 @@ export const Editor: React.FC<EditorProps> = ({
   const [isAutoTrimming, setIsAutoTrimming] = useState<boolean>(false);
   const [cropHistory, setCropHistory] = useState<ImageItem[]>([]);
   const [cropDragMode, setCropDragMode] = useState<string | null>(null);
+
+  // Keyboard shortcut notice and cheat-sheet modal
+  const [shortcutFeedback, setShortcutFeedback] = useState<string | null>(null);
+  const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
+
+  const showShortcutNotice = (msg: string) => {
+    setShortcutFeedback(msg);
+    setTimeout(() => {
+      setShortcutFeedback((curr) => (curr === msg ? null : curr));
+    }, 2000);
+  };
+
+  // Instant in-editor Star Rating & quick tags
+  const [quickRatedStar, setQuickRatedStar] = useState<number | null>(null);
+
+  const handleQuickStarRate = (stars: number) => {
+    setQuickRatedStar(stars);
+    showShortcutNotice(`★ Rated ${stars}/5 Stars! Thank you.`);
+
+    const newFeedback = {
+      id: 'fb_quick_' + Date.now().toString(36),
+      userName: 'Creator',
+      userRole: 'Editor User',
+      rating: stars,
+      qualityRating: stars,
+      edgeRating: stars,
+      speedRating: 5,
+      category: 'AI accuracy & cutout quality',
+      tags: stars >= 4 ? ['Crisp edges', 'Zero halo'] : ['Needs refinement'],
+      message: `Quick in-editor ${stars}-star rating on image: ${image.name}`,
+      helpfulCount: 0,
+      isVerified: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      const stored = localStorage.getItem('auracut_user_feedbacks');
+      const existing = stored ? JSON.parse(stored) : [];
+      localStorage.setItem('auracut_user_feedbacks', JSON.stringify([newFeedback, ...existing]));
+    } catch {}
+
+    fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newFeedback),
+    }).catch(() => {});
+  };
+
+  const handleQuickFeedbackTag = (tag: string) => {
+    showShortcutNotice(`Feedback tag recorded: ${tag}`);
+    const newFeedback = {
+      id: 'fb_tag_' + Date.now().toString(36),
+      userName: 'Creator',
+      userRole: 'Editor User',
+      rating: 5,
+      qualityRating: 5,
+      edgeRating: 5,
+      speedRating: 5,
+      category: 'AI accuracy & cutout quality',
+      tags: [tag],
+      message: `User tagged image cutout as: ${tag}`,
+      helpfulCount: 0,
+      isVerified: true,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      const stored = localStorage.getItem('auracut_user_feedbacks');
+      const existing = stored ? JSON.parse(stored) : [];
+      localStorage.setItem('auracut_user_feedbacks', JSON.stringify([newFeedback, ...existing]));
+    } catch {}
+  };
 
   // Exact natural image aspect ratio
   const imgAspect = image.width && image.height && image.height > 0 ? image.width / image.height : 1;
@@ -200,6 +287,61 @@ export const Editor: React.FC<EditorProps> = ({
     box: { x: 5, y: 5, width: 90, height: 90 },
     containerRect: null,
   });
+
+  const originalImageRef = useRef<HTMLImageElement | null>(null);
+  const initialCutoutUrlRef = useRef<string>(image.processedUrl || '');
+  const lastStrokePosRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Preload original image for instantaneous pixel restoration
+  useEffect(() => {
+    if (image.originalUrl) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = image.originalUrl;
+      originalImageRef.current = img;
+    }
+    if (image.processedUrl && !initialCutoutUrlRef.current) {
+      initialCutoutUrlRef.current = image.processedUrl;
+    }
+  }, [image.originalUrl, image.processedUrl]);
+
+  // Synchronize brush canvas when entering brush mode
+  useEffect(() => {
+    if (!isBrushMode || !brushCanvasRef.current || !image.processedUrl) return;
+    const canvas = brushCanvasRef.current;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      canvas.width = img.naturalWidth || image.width || 800;
+      canvas.height = img.naturalHeight || image.height || 600;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+      }
+    };
+    img.src = image.processedUrl;
+  }, [isBrushMode]);
+
+  // Global Keyboard Shortcuts for Brush Undo / Redo (Ctrl+Z / Cmd+Z and Ctrl+Y / Cmd+Shift+Z)
+  useEffect(() => {
+    if (!isBrushMode) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+      if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndoBrush();
+      } else if (
+        (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'z') ||
+        (isCtrlOrCmd && e.key.toLowerCase() === 'y')
+      ) {
+        e.preventDefault();
+        handleRedoBrush();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBrushMode, brushUndoStack, brushRedoStack]);
 
   // Re-composite canvas whenever background or effects change
   useEffect(() => {
@@ -581,24 +723,105 @@ export const Editor: React.FC<EditorProps> = ({
     });
   };
 
-  // Handle Brush painting on mask
-  const startBrushPaint = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isBrushMode || !brushCanvasRef.current) return;
-    setIsDrawing(true);
-    if (image.processedUrl) {
-      setBrushHistory((prev) => [...prev.slice(-8), image.processedUrl!]);
+  // Coordinate translation accounting for CSS scaling, zoom, and viewport
+  const getCanvasCoords = (clientX: number, clientY: number): { x: number; y: number } | null => {
+    const canvas = brushCanvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    const x = ((clientX - rect.left) / rect.width) * canvas.width;
+    const y = ((clientY - rect.top) / rect.height) * canvas.height;
+    return { x, y };
+  };
+
+  // Render a single brush footprint with hardness gradient and opacity
+  const paintPoint = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) => {
+    ctx.save();
+    ctx.globalAlpha = brushOpacity / 100;
+    if (brushAction === 'erase') {
+      ctx.globalCompositeOperation = 'destination-out';
+      if (brushHardness < 90) {
+        const innerRadius = radius * (brushHardness / 100);
+        const grad = ctx.createRadialGradient(x, y, innerRadius, x, y, radius);
+        grad.addColorStop(0, 'rgba(0,0,0,1)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,1)';
+      }
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Restore original pixels
+      ctx.globalCompositeOperation = 'source-over';
+      const orig = originalImageRef.current;
+      if (orig && orig.complete && orig.naturalWidth > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(orig, 0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.restore();
+      }
     }
-    paintAt(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+    ctx.restore();
   };
 
-  const drawBrushPaint = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !isBrushMode) return;
-    paintAt(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+  // Continuous stroke interpolation to eliminate gaps during rapid movements
+  const paintLine = (x0: number, y0: number, x1: number, y1: number) => {
+    const canvas = brushCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const radius = brushSize / 2;
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const step = Math.max(1, radius / 3);
+    const numSteps = Math.ceil(dist / step);
+    for (let i = 0; i <= numSteps; i++) {
+      const t = numSteps === 0 ? 0 : i / numSteps;
+      const x = x0 + dx * t;
+      const y = y0 + dy * t;
+      paintPoint(ctx, x, y, radius);
+    }
   };
 
-  const stopBrushPaint = () => {
+  // Brush Interaction Handlers
+  const handleBrushStart = (clientX: number, clientY: number) => {
+    if (!isBrushMode || !brushCanvasRef.current) return;
+    const coords = getCanvasCoords(clientX, clientY);
+    if (!coords) return;
+
+    // Snapshot current state to Undo Stack
+    const currentData = brushCanvasRef.current.toDataURL('image/png');
+    setBrushUndoStack((prev) => [...prev.slice(-24), currentData]);
+    setBrushRedoStack([]); // Clear Redo history on new stroke
+
+    setIsDrawing(true);
+    lastStrokePosRef.current = coords;
+
+    const ctx = brushCanvasRef.current.getContext('2d');
+    if (ctx) {
+      paintPoint(ctx, coords.x, coords.y, brushSize / 2);
+    }
+  };
+
+  const handleBrushMove = (clientX: number, clientY: number) => {
+    const coords = getCanvasCoords(clientX, clientY);
+    if (coords) {
+      setCursorPos({ x: clientX, y: clientY, visible: true });
+    }
+    if (!isDrawing || !isBrushMode || !lastStrokePosRef.current || !coords) return;
+    paintLine(lastStrokePosRef.current.x, lastStrokePosRef.current.y, coords.x, coords.y);
+    lastStrokePosRef.current = coords;
+  };
+
+  const handleBrushEnd = () => {
     if (!isDrawing) return;
     setIsDrawing(false);
+    lastStrokePosRef.current = null;
     if (brushCanvasRef.current) {
       const updatedUrl = brushCanvasRef.current.toDataURL('image/png');
       onUpdateImage({
@@ -608,37 +831,257 @@ export const Editor: React.FC<EditorProps> = ({
     }
   };
 
-  const paintAt = (x: number, y: number) => {
+  // Undo Stroke from History
+  const handleUndoBrush = () => {
+    if (brushUndoStack.length === 0 || !brushCanvasRef.current) return;
+    const canvas = brushCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const currentState = canvas.toDataURL('image/png');
+    const previousState = brushUndoStack[brushUndoStack.length - 1];
+
+    setBrushRedoStack((prev) => [...prev.slice(-24), currentState]);
+    setBrushUndoStack((prev) => prev.slice(0, -1));
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      onUpdateImage({
+        ...image,
+        processedUrl: previousState,
+      });
+    };
+    img.src = previousState;
+  };
+
+  // Redo Stroke from History
+  const handleRedoBrush = () => {
+    if (brushRedoStack.length === 0 || !brushCanvasRef.current) return;
+    const canvas = brushCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const currentState = canvas.toDataURL('image/png');
+    const nextState = brushRedoStack[brushRedoStack.length - 1];
+
+    setBrushUndoStack((prev) => [...prev.slice(-24), currentState]);
+    setBrushRedoStack((prev) => prev.slice(0, -1));
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      onUpdateImage({
+        ...image,
+        processedUrl: nextState,
+      });
+    };
+    img.src = nextState;
+  };
+
+  // Reset to initial AI Cutout
+  const handleResetToAICutout = () => {
+    if (!brushCanvasRef.current || !initialCutoutUrlRef.current) return;
+    const canvas = brushCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const currentState = canvas.toDataURL('image/png');
+    setBrushUndoStack((prev) => [...prev.slice(-24), currentState]);
+    setBrushRedoStack([]);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      onUpdateImage({
+        ...image,
+        processedUrl: initialCutoutUrlRef.current,
+      });
+    };
+    img.src = initialCutoutUrlRef.current;
+  };
+
+  // Clear workspace canvas modifications (triggered by Delete / Backspace or clear button)
+  const handleClearWorkspaceOrObject = () => {
+    if (isCropMode) {
+      setIsCropMode(false);
+      showShortcutNotice('Cancelled Crop Mode (Del / Esc)');
+      return;
+    }
+    if (brushUndoStack.length > 0) {
+      handleResetToAICutout();
+      showShortcutNotice('Reverted brush edits to initial AI cutout (Del)');
+      return;
+    }
+    // Reset background and effects to pristine transparent cutout
+    setBgConfig({
+      type: 'transparent',
+      color: '#ffffff',
+      gradient: GRADIENT_PRESETS[0].value,
+      blurAmount: 16,
+    });
+    setEffects((prev) => ({
+      ...prev,
+      shadow: { ...prev.shadow, enabled: false },
+      outline: { ...prev.outline, enabled: false, width: 0 },
+      reflection: { ...prev.reflection, enabled: false },
+      colorAdjustments: {
+        brightness: 1,
+        contrast: 1,
+        saturation: 1,
+        colorHarmonize: false,
+      },
+      invert: false,
+    }));
+    showShortcutNotice('Reset workspace canvas to transparent cutout (Del)');
+  };
+
+  // Register Global Keyboard Shortcuts
+  useKeyboardShortcuts({
+    onUndo: () => {
+      if (isBrushMode && brushUndoStack.length > 0) {
+        handleUndoBrush();
+        showShortcutNotice('Undo: Reverted brush stroke (Ctrl+Z)');
+      } else if (cropHistory.length > 0) {
+        handleUndoCrop();
+        showShortcutNotice('Undo: Reverted crop (Ctrl+Z)');
+      } else if (brushUndoStack.length > 0) {
+        handleUndoBrush();
+        showShortcutNotice('Undo: Reverted stroke (Ctrl+Z)');
+      } else {
+        showShortcutNotice('Nothing to undo (Ctrl+Z)');
+      }
+    },
+    onRedo: () => {
+      if (brushRedoStack.length > 0) {
+        handleRedoBrush();
+        showShortcutNotice('Redo: Restored stroke (Ctrl+Y)');
+      } else {
+        showShortcutNotice('Nothing to redo (Ctrl+Y)');
+      }
+    },
+    onDelete: handleClearWorkspaceOrObject,
+    onClear: handleClearWorkspaceOrObject,
+    onIncreaseBrushSize: () => {
+      setBrushSize((s) => {
+        const next = Math.min(140, s + 6);
+        showShortcutNotice(`Brush Size: ${next}px (])`);
+        return next;
+      });
+    },
+    onDecreaseBrushSize: () => {
+      setBrushSize((s) => {
+        const next = Math.max(4, s - 6);
+        showShortcutNotice(`Brush Size: ${next}px ([)`);
+        return next;
+      });
+    },
+    onToggleBrushMode: () => {
+      setIsBrushMode((prev) => {
+        const next = !prev;
+        if (next) {
+          setViewMode('cutout');
+          setIsCropMode(false);
+          showShortcutNotice('Refinement Eraser Brush Enabled (B)');
+        } else {
+          showShortcutNotice('Refinement Brush Closed (B)');
+        }
+        return next;
+      });
+    },
+    onToggleCropMode: () => {
+      if (isCropMode) {
+        setIsCropMode(false);
+        showShortcutNotice('Exited Crop Mode (C)');
+      } else {
+        handleStartCrop();
+        showShortcutNotice('Crop & Trim Tool (C)');
+      }
+    },
+    onZoomIn: () => {
+      setZoomLevel((z) => {
+        const next = Math.min(3, +(z + 0.25).toFixed(2));
+        showShortcutNotice(`Zoom: ${Math.round(next * 100)}% (Ctrl+)`);
+        return next;
+      });
+    },
+    onZoomOut: () => {
+      setZoomLevel((z) => {
+        const next = Math.max(0.5, +(z - 0.25).toFixed(2));
+        showShortcutNotice(`Zoom: ${Math.round(next * 100)}% (Ctrl-)`);
+        return next;
+      });
+    },
+    onResetZoom: () => {
+      setZoomLevel(1);
+      showShortcutNotice('Zoom Reset: 100% (Ctrl+0)');
+    },
+    onEscape: () => {
+      if (showShortcutsModal) {
+        setShowShortcutsModal(false);
+      } else if (isCropMode) {
+        setIsCropMode(false);
+        showShortcutNotice('Exited Crop Mode (Esc)');
+      } else if (isBrushMode) {
+        setIsBrushMode(false);
+        showShortcutNotice('Exited Brush Mode (Esc)');
+      }
+    },
+  });
+
+  // 1-Click Boundary Choke to instantly eliminate halo outline
+  const handleChokeBoundary = (pixels: number = 1) => {
     const canvas = brushCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+    const currentState = canvas.toDataURL('image/png');
+    setBrushUndoStack((prev) => [...prev.slice(-24), currentState]);
+    setBrushRedoStack([]);
 
-    if (brushAction === 'erase') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.fillStyle = 'rgba(0,0,0,1)';
-      ctx.fill();
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
-      const orig = new Image();
-      orig.src = image.originalUrl;
-      ctx.clip();
-      ctx.drawImage(orig, 0, 0, canvas.width, canvas.height);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+    const w = canvas.width;
+    const h = canvas.height;
+    const alphaCopy = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) {
+      alphaCopy[i] = data[i * 4 + 3];
     }
-    ctx.restore();
-  };
 
-  const undoBrush = () => {
-    if (brushHistory.length === 0) return;
-    const previous = brushHistory[brushHistory.length - 1];
-    setBrushHistory((prev) => prev.slice(0, -1));
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = y * w + x;
+        if (alphaCopy[idx] > 0) {
+          let hasTransparentNeighbor = false;
+          for (let dy = -pixels; dy <= pixels && !hasTransparentNeighbor; dy++) {
+            for (let dx = -pixels; dx <= pixels; dx++) {
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= w || ny >= h || alphaCopy[ny * w + nx] < 40) {
+                hasTransparentNeighbor = true;
+                break;
+              }
+            }
+          }
+          if (hasTransparentNeighbor) {
+            data[idx * 4 + 3] = 0;
+          }
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    const updated = canvas.toDataURL('image/png');
     onUpdateImage({
       ...image,
-      processedUrl: previous,
+      processedUrl: updated,
     });
   };
 
@@ -875,12 +1318,57 @@ export const Editor: React.FC<EditorProps> = ({
               <span>Refine Brush</span>
             </button>
 
+            {/* Undo / Redo & Clear Workspace Buttons */}
+            <div className="flex items-center gap-1 border-r border-slate-200 dark:border-slate-800 pr-1.5">
+              <button
+                onClick={() => {
+                  if (isBrushMode && brushUndoStack.length > 0) handleUndoBrush();
+                  else if (cropHistory.length > 0) handleUndoCrop();
+                  else if (brushUndoStack.length > 0) handleUndoBrush();
+                  else showShortcutNotice('Nothing to undo (Ctrl+Z)');
+                }}
+                disabled={brushUndoStack.length === 0 && cropHistory.length === 0}
+                className="p-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1"
+                title="Undo last stroke or crop (Ctrl+Z)"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[10px] font-mono text-slate-400">⌘Z</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (brushRedoStack.length > 0) handleRedoBrush();
+                  else showShortcutNotice('Nothing to redo (Ctrl+Y)');
+                }}
+                disabled={brushRedoStack.length === 0}
+                className="p-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center gap-1"
+                title="Redo stroke (Ctrl+Y or ⇧⌘Z)"
+              >
+                <Redo2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[10px] font-mono text-slate-400">⌘Y</span>
+              </button>
+              <button
+                onClick={handleClearWorkspaceOrObject}
+                className="p-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 hover:border-red-300 transition-all flex items-center gap-1"
+                title="Clear workspace modifications (Delete / Backspace)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[10px] font-mono text-slate-400">Del</span>
+              </button>
+              <button
+                onClick={() => setShowShortcutsModal(true)}
+                className="p-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-all"
+                title="View Keyboard Shortcuts Cheatsheet"
+              >
+                <Keyboard className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
             {/* Zoom Controls */}
             <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl">
               <button
                 onClick={() => setZoomLevel((z) => Math.max(0.5, z - 0.25))}
                 className="p-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                title="Zoom Out"
+                title="Zoom Out (Ctrl-)"
               >
                 <ZoomOut className="w-3.5 h-3.5" />
               </button>
@@ -890,18 +1378,94 @@ export const Editor: React.FC<EditorProps> = ({
               <button
                 onClick={() => setZoomLevel((z) => Math.min(3, z + 0.25))}
                 className="p-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                title="Zoom In"
+                title="Zoom In (Ctrl+)"
               >
                 <ZoomIn className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setZoomLevel(1)}
                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                title="Reset Zoom"
+                title="Reset Zoom (Ctrl+0)"
               >
                 <Maximize2 className="w-3 h-3" />
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Floating Keyboard Shortcut Notice Toast */}
+        {shortcutFeedback && (
+          <div className="fixed top-20 right-6 z-50 animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/95 dark:bg-slate-100/95 text-white dark:text-slate-900 text-xs font-bold shadow-xl border border-slate-700/80 dark:border-slate-300 backdrop-blur-md">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400 dark:text-indigo-600" />
+              <span>{shortcutFeedback}</span>
+            </div>
+          </div>
+        )}
+
+        {/* IN-EDITOR INSTANT STAR RATING & QUICK FEEDBACK STRIP */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 px-4 py-2 bg-gradient-to-r from-amber-50/80 via-slate-50 to-indigo-50/60 dark:from-slate-900/90 dark:via-slate-900/60 dark:to-indigo-950/40 rounded-2xl border border-amber-200/60 dark:border-slate-800 shadow-xs text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              Rate this AI Cutout:
+            </span>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => handleQuickStarRate(star)}
+                  className="p-0.5 focus:outline-none transition-transform hover:scale-125"
+                  title={`Rate ${star} Star${star > 1 ? 's' : ''}`}
+                >
+                  <Star
+                    className={`w-4 h-4 ${
+                      (quickRatedStar || 0) >= star
+                        ? 'fill-amber-400 text-amber-400'
+                        : 'text-slate-300 dark:text-slate-600 hover:text-amber-400'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+            {quickRatedStar && (
+              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 animate-in fade-in">
+                ★ {quickRatedStar}/5 Saved!
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-1 text-[11px]">
+              <button
+                onClick={() => handleQuickFeedbackTag('Crisp edges')}
+                className="px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 text-slate-700 dark:text-slate-300 transition-colors"
+              >
+                ✨ Crisp edges
+              </button>
+              <button
+                onClick={() => handleQuickFeedbackTag('Hair preserved')}
+                className="px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 text-slate-700 dark:text-slate-300 transition-colors"
+              >
+                💇 Hair preserved
+              </button>
+              <button
+                onClick={() => handleQuickFeedbackTag('Zero halo')}
+                className="px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 text-slate-700 dark:text-slate-300 transition-colors"
+              >
+                🚫 Zero halo
+              </button>
+            </div>
+
+            {onOpenFeedback && (
+              <button
+                onClick={onOpenFeedback}
+                className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+              >
+                <span>Detailed Review</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -992,62 +1556,160 @@ export const Editor: React.FC<EditorProps> = ({
           </div>
         )}
 
-        {/* Brush Controls Bar when Active */}
+        {/* Refinement Eraser Controls Bar with History & Sliders */}
         {isBrushMode && (
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-indigo-50/80 dark:bg-indigo-950/40 rounded-2xl border border-indigo-200/80 dark:border-indigo-900/60 animate-in slide-in-from-top-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1">
-                <Paintbrush className="w-3.5 h-3.5" />
-                Active Tool:
-              </span>
-              <button
-                onClick={() => setBrushAction('erase')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg ${
-                  brushAction === 'erase'
-                    ? 'bg-red-500 text-white'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <Eraser className="w-3 h-3" />
-                <span>Erase BG</span>
-              </button>
-              <button
-                onClick={() => setBrushAction('restore')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg ${
-                  brushAction === 'restore'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Restore Edge</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-600 dark:text-slate-400">Brush Size:</span>
-                <input
-                  type="range"
-                  min="5"
-                  max="100"
-                  value={brushSize}
-                  onChange={(e) => setBrushSize(Number(e.target.value))}
-                  className="w-24 accent-indigo-600"
-                />
-                <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400">
-                  {brushSize}px
-                </span>
+          <div className="flex flex-col gap-2.5 p-3.5 bg-white dark:bg-slate-900 rounded-2xl border-2 border-indigo-500/40 shadow-lg animate-in slide-in-from-top-2">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Tool Mode Selector */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                <button
+                  onClick={() => setBrushAction('erase')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    brushAction === 'erase'
+                      ? 'bg-red-600 text-white shadow-sm shadow-red-600/30'
+                      : 'text-slate-700 dark:text-slate-300 hover:text-red-500'
+                  }`}
+                  title="Erase unwanted background artifacts, halos or edge spill"
+                >
+                  <Eraser className="w-3.5 h-3.5" />
+                  <span>Refinement Eraser</span>
+                </button>
+                <button
+                  onClick={() => setBrushAction('restore')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    brushAction === 'restore'
+                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
+                      : 'text-slate-700 dark:text-slate-300 hover:text-emerald-500'
+                  }`}
+                  title="Restore original photo pixels back into the foreground"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restore Details</span>
+                </button>
               </div>
 
+              {/* Sliders: Size, Hardness, Opacity */}
+              <div className="flex flex-wrap items-center gap-4">
+                {/* Brush Size */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Size:</span>
+                  <input
+                    type="range"
+                    min="4"
+                    max="140"
+                    value={brushSize}
+                    onChange={(e) => setBrushSize(Number(e.target.value))}
+                    className="w-20 sm:w-24 accent-indigo-600"
+                    title={`Brush diameter: ${brushSize}px`}
+                  />
+                  <span className="text-xs font-mono font-bold min-w-[34px] text-indigo-600 dark:text-indigo-400">
+                    {brushSize}px
+                  </span>
+                </div>
+
+                {/* Hardness */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Hardness:</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={brushHardness}
+                    onChange={(e) => setBrushHardness(Number(e.target.value))}
+                    className="w-16 sm:w-20 accent-indigo-600"
+                    title={`Edge hardness: ${brushHardness}%`}
+                  />
+                  <span className="text-xs font-mono font-bold min-w-[28px] text-slate-600 dark:text-slate-300">
+                    {brushHardness}%
+                  </span>
+                </div>
+
+                {/* Opacity */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">Opacity:</span>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    value={brushOpacity}
+                    onChange={(e) => setBrushOpacity(Number(e.target.value))}
+                    className="w-16 sm:w-20 accent-indigo-600"
+                    title={`Stroke opacity: ${brushOpacity}%`}
+                  />
+                  <span className="text-xs font-mono font-bold min-w-[28px] text-slate-600 dark:text-slate-300">
+                    {brushOpacity}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Undo / Redo & Quick Actions */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleUndoBrush}
+                  disabled={brushUndoStack.length === 0}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                  title="Undo last stroke (Ctrl+Z)"
+                >
+                  <Undo2 className="w-3.5 h-3.5" />
+                  <span>Undo</span>
+                  {brushUndoStack.length > 0 && (
+                    <span className="text-[10px] text-indigo-500 font-mono">({brushUndoStack.length})</span>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleRedoBrush}
+                  disabled={brushRedoStack.length === 0}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-50 transition-colors"
+                  title="Redo stroke (Ctrl+Y or Ctrl+Shift+Z)"
+                >
+                  <Redo2 className="w-3.5 h-3.5" />
+                  <span>Redo</span>
+                  {brushRedoStack.length > 0 && (
+                    <span className="text-[10px] text-indigo-500 font-mono">({brushRedoStack.length})</span>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleResetToAICutout}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 hover:bg-slate-50 transition-colors"
+                  title="Revert all brush modifications to initial AI cutout"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Reset Cutout</span>
+                </button>
+
+                <button
+                  onClick={() => setIsBrushMode(false)}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all"
+                  title="Finish touching up"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Done</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick 1-Click Edge Refinements */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
+              <span className="font-semibold text-[11px] uppercase tracking-wider text-slate-500">1-Click Edge Refinements:</span>
               <button
-                onClick={undoBrush}
-                disabled={brushHistory.length === 0}
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-40"
+                onClick={() => handleChokeBoundary(1)}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 font-medium transition-colors"
+                title="Erase 1px boundary halo all around the subject"
               >
-                <Undo2 className="w-3 h-3" />
-                <span>Undo</span>
+                Trim Fringe (-1px)
               </button>
+              <button
+                onClick={() => handleChokeBoundary(2)}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 font-medium transition-colors"
+                title="Erase 2px boundary halo for stubborn background outlines"
+              >
+                Trim Fringe (-2px)
+              </button>
+              <span className="text-[11px] text-slate-400 ml-auto hidden sm:inline">
+                Hover over cutout to see brush cursor • One-finger touch supported on mobile
+              </span>
             </div>
           </div>
         )}
@@ -1318,22 +1980,90 @@ export const Editor: React.FC<EditorProps> = ({
               </div>
             )}
 
-            {/* Fine-Tuning Interactive Brush Canvas */}
+            {/* Fine-Tuning Interactive Refinement Eraser Canvas */}
             {isBrushMode && image.processedUrl && (
-              <div className="relative">
+              <div
+                className="relative inline-block select-none touch-none"
+                onMouseLeave={() => {
+                  setCursorPos((prev) => ({ ...prev, visible: false }));
+                  handleBrushEnd();
+                }}
+              >
                 <canvas
                   ref={brushCanvasRef}
                   width={image.width || 800}
                   height={image.height || 600}
-                  onMouseDown={startBrushPaint}
-                  onMouseMove={drawBrushPaint}
-                  onMouseUp={stopBrushPaint}
-                  onMouseLeave={stopBrushPaint}
-                  className="max-h-[60vh] object-contain cursor-crosshair rounded-xl border border-indigo-400"
+                  onMouseDown={(e) => handleBrushStart(e.clientX, e.clientY)}
+                  onMouseMove={(e) => handleBrushMove(e.clientX, e.clientY)}
+                  onMouseUp={handleBrushEnd}
+                  onTouchStart={(e) => {
+                    if (e.touches.length === 1) {
+                      e.preventDefault();
+                      handleBrushStart(e.touches[0].clientX, e.touches[0].clientY);
+                    }
+                  }}
+                  onTouchMove={(e) => {
+                    if (e.touches.length === 1) {
+                      e.preventDefault();
+                      handleBrushMove(e.touches[0].clientX, e.touches[0].clientY);
+                    }
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    handleBrushEnd();
+                  }}
+                  className="max-h-[60vh] object-contain cursor-none rounded-xl shadow-2xl border-2 border-indigo-500/80 bg-transparent"
                 />
-                <p className="text-[11px] text-center text-slate-500 mt-2 font-medium">
-                  Click and drag to {brushAction === 'erase' ? 'erase pixels' : 'restore details'}.
-                </p>
+
+                {/* Live Brush Cursor Overlay Indicator */}
+                {cursorPos.visible && brushCanvasRef.current && (() => {
+                  const rect = brushCanvasRef.current.getBoundingClientRect();
+                  const scaleRatio = rect.width / (brushCanvasRef.current.width || 1);
+                  const displayRadius = Math.max(3, (brushSize / 2) * scaleRatio);
+                  const x = cursorPos.x - rect.left;
+                  const y = cursorPos.y - rect.top;
+
+                  return (
+                    <div
+                      className="pointer-events-none absolute"
+                      style={{
+                        left: `${x}px`,
+                        top: `${y}px`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                    >
+                      <div
+                        className={`rounded-full border-2 transition-transform duration-75 flex items-center justify-center ${
+                          brushAction === 'erase'
+                            ? 'border-red-500 bg-red-500/15 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+                            : 'border-emerald-500 bg-emerald-500/15 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                        }`}
+                        style={{
+                          width: `${displayRadius * 2}px`,
+                          height: `${displayRadius * 2}px`,
+                        }}
+                      >
+                        <div
+                          className={`w-1 h-1 rounded-full ${
+                            brushAction === 'erase' ? 'bg-red-500' : 'bg-emerald-500'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2 px-1 font-medium">
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        brushAction === 'erase' ? 'bg-red-500 animate-pulse' : 'bg-emerald-500 animate-pulse'
+                      }`}
+                    />
+                    Mode: <strong className="text-slate-800 dark:text-slate-200">{brushAction === 'erase' ? 'Erase Artifacts & Halos' : 'Restore Photo Details'}</strong>
+                  </span>
+                  <span>Shortcut: <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-mono">Ctrl+Z</kbd> Undo • <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-mono">Ctrl+Y</kbd> Redo</span>
+                </div>
               </div>
             )}
           </div>
@@ -2166,6 +2896,126 @@ export const Editor: React.FC<EditorProps> = ({
           )}
         </div>
       </div>
+
+      {/* KEYBOARD SHORTCUTS CHEAT SHEET MODAL */}
+      {showShortcutsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6 overflow-hidden">
+            <button
+              onClick={() => setShowShortcutsModal(false)}
+              className="absolute top-5 right-5 p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="p-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                <Keyboard className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Keyboard Shortcuts
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Speed up background editing with standard keys
+                </p>
+              </div>
+            </div>
+
+            <div className="divide-y divide-slate-100 dark:divide-slate-800 py-2 text-xs">
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  Undo last stroke / crop
+                </span>
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                  Ctrl + Z / ⌘Z
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">Redo stroke</span>
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                  Ctrl + Y / ⇧⌘Z
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  Clear / Reset workspace edits
+                </span>
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                  Delete / Backspace
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  Toggle Refinement Eraser
+                </span>
+                <kbd className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                  B
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  Toggle Crop & Trim Tool
+                </span>
+                <kbd className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                  C
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  Decrease / Increase Brush Size
+                </span>
+                <div className="flex items-center gap-1">
+                  <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                    [
+                  </kbd>
+                  <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                    ]
+                  </kbd>
+                </div>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  Zoom In / Zoom Out
+                </span>
+                <div className="flex items-center gap-1">
+                  <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                    Ctrl +
+                  </kbd>
+                  <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                    Ctrl -
+                  </kbd>
+                </div>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  Reset Zoom (100%)
+                </span>
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                  Ctrl + 0
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  Cancel / Close Active Tool
+                </span>
+                <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-[11px] shadow-xs">
+                  Esc
+                </kbd>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button
+                onClick={() => setShowShortcutsModal(false)}
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

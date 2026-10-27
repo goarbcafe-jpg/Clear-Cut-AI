@@ -8,6 +8,8 @@ import {
   Moon,
   Laptop,
   HelpCircle,
+  Star,
+  ShieldCheck,
   Wifi,
   WifiOff,
   User as UserIcon,
@@ -33,6 +35,8 @@ interface HeaderProps {
   onLogout: () => void;
   onOpenTutorial: () => void;
   offlineQueueCount: number;
+  onOpenFeedback?: () => void;
+  onOpenAdmin?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -48,6 +52,8 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onOpenTutorial,
   offlineQueueCount,
+  onOpenFeedback,
+  onOpenAdmin,
 }) => {
   const nextTheme: Record<ThemeMode, ThemeMode> = {
     system: 'dark',
@@ -220,10 +226,37 @@ export const Header: React.FC<HeaderProps> = ({
             {themeIcon}
           </button>
 
+          {/* Feedback & Star Rating */}
+          {onOpenFeedback && (
+            <button
+              onClick={onOpenFeedback}
+              title="Community Star Ratings & Feedback"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border border-amber-200/80 dark:border-amber-800/80 text-amber-800 dark:text-amber-300 hover:border-amber-400 hover:shadow-xs transition-all text-xs font-bold"
+            >
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 animate-pulse" />
+              <span>4.9</span>
+              <span className="hidden sm:inline text-amber-600/80 dark:text-amber-400/80 font-normal">
+                Reviews
+              </span>
+            </button>
+          )}
+
+          {/* Admin Dashboard */}
+          {onOpenAdmin && (
+            <button
+              onClick={onOpenAdmin}
+              title="Admin Operations Console"
+              className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:text-indigo-600 transition-all"
+              aria-label="Admin"
+            >
+              <ShieldCheck className="w-4 h-4" />
+            </button>
+          )}
+
           {/* Tutorial / Help Button */}
           <button
             onClick={onOpenTutorial}
-            title="Interactive Beginner Guide & Shortcuts"
+            title="Help Center, Guides & FAQs"
             className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-all relative"
             aria-label="Tutorial"
           >

@@ -18,6 +18,9 @@ import { AuthModal } from './components/AuthModal';
 import { CloudinaryModal } from './components/CloudinaryModal';
 import { TutorialModal } from './components/TutorialModal';
 import { ShareModal } from './components/ShareModal';
+import { FeedbackModal, FeedbackEntry } from './components/FeedbackModal';
+import { HelpCenterModal } from './components/HelpCenterModal';
+import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { AIStudio } from './components/AIStudio';
 import { ProjectsManager } from './components/ProjectsManager';
 import { ProfileView } from './components/ProfileView';
@@ -84,6 +87,17 @@ export default function App() {
   const [showCloudinaryModal, setShowCloudinaryModal] = useState<boolean>(false);
   const [showTutorialModal, setShowTutorialModal] = useState<boolean>(false);
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState<boolean>(false);
+  const [showHelpCenterModal, setShowHelpCenterModal] = useState<boolean>(false);
+  const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
+  const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>(() => {
+    try {
+      const stored = localStorage.getItem("auracut_user_feedbacks");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [shareUrls, setShareUrls] = useState<{ processed: string; original: string }>({
     processed: '',
     original: '',
@@ -620,8 +634,10 @@ export default function App() {
         currentUser={currentUser}
         onOpenAuth={() => setShowAuthModal(true)}
         onLogout={handleLogout}
-        onOpenTutorial={() => setShowTutorialModal(true)}
+        onOpenTutorial={() => setShowHelpCenterModal(true)}
         offlineQueueCount={offlineQueueCount}
+        onOpenFeedback={() => setShowFeedbackModal(true)}
+        onOpenAdmin={() => setShowAdminModal(true)}
       />
 
       {/* Main Content Area */}
@@ -633,6 +649,7 @@ export default function App() {
               onImagesSelected={handleImagesSelected}
               onSelectSample={handleSelectSample}
               onNavigateTab={setActiveTab}
+              onOpenFeedback={() => setShowFeedbackModal(true)}
             />
 
             {/* Quick Recent Projects bar on Home */}
@@ -687,6 +704,7 @@ export default function App() {
                 onImagesSelected={handleImagesSelected}
                 onSelectSample={handleSelectSample}
                 onNavigateTab={setActiveTab}
+                onOpenFeedback={() => setShowFeedbackModal(true)}
               />
             ) : (
               <div className="space-y-4">
@@ -708,7 +726,8 @@ export default function App() {
                   onUploadToCloudinary={handleUploadToCloudinary}
                   onOpenShare={handleOpenShare}
                   isOnline={isOnline}
-                  onOpenTutorial={() => setShowTutorialModal(true)}
+                  onOpenTutorial={() => setShowHelpCenterModal(true)}
+                  onOpenFeedback={() => setShowFeedbackModal(true)}
                 />
               </div>
             )}
@@ -837,6 +856,38 @@ export default function App() {
           processedUrl={shareUrls.processed}
           originalUrl={shareUrls.original}
           onClose={() => setShowShareModal(false)}
+        />
+      )}
+      {showFeedbackModal && (
+        <FeedbackModal
+          isOpen={showFeedbackModal}
+          onClose={() => setShowFeedbackModal(false)}
+          currentUser={currentUser}
+          onSubmitted={(item) => {
+            setFeedbacks((prev) => [item, ...prev]);
+            showToast("Thank you for rating ClearCut AI!", "success");
+          }}
+        />
+      )}
+      {showHelpCenterModal && (
+        <HelpCenterModal
+          isOpen={showHelpCenterModal}
+          onClose={() => setShowHelpCenterModal(false)}
+          onOpenFeedback={() => {
+            setShowHelpCenterModal(false);
+            setShowFeedbackModal(true);
+          }}
+        />
+      )}
+      {showAdminModal && (
+        <AdminDashboardModal
+          isOpen={showAdminModal}
+          onClose={() => setShowAdminModal(false)}
+          feedbacks={feedbacks}
+          onDeleteFeedback={(id) => {
+            setFeedbacks((prev) => prev.filter((f) => f.id !== id));
+            showToast("Review moderated", "info");
+          }}
         />
       )}
     </div>
