@@ -23,6 +23,8 @@ interface DropzoneProps {
   onSelectSample: (sample: SampleImage) => void;
   onNavigateTab?: (tab: MainNavTab) => void;
   onOpenFeedback?: () => void;
+  onOpenPricing?: (planId?: 'plan_monthly' | 'plan_twomonth' | 'plan_sixmonth') => void;
+  onOpenBackgroundApi?: () => void;
   isProcessing?: boolean;
 }
 
@@ -31,6 +33,8 @@ export const Dropzone: React.FC<DropzoneProps> = ({
   onSelectSample,
   onNavigateTab,
   onOpenFeedback,
+  onOpenPricing,
+  onOpenBackgroundApi,
   isProcessing = false,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -99,7 +103,7 @@ export const Dropzone: React.FC<DropzoneProps> = ({
       <div className="text-center space-y-3">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Full-Stack AI Cutout & Studio Engine</span>
+          <span>GURUCUT AI — Studio Background Remover</span>
         </div>
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white">
           Remove Image Backgrounds{' '}
@@ -109,8 +113,38 @@ export const Dropzone: React.FC<DropzoneProps> = ({
         </h1>
         <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
           Edge-preserving cutout for portraits, e-commerce, hair, and complex objects.
-          Runs 100% locally offline or with Gemini AI server intelligence.
+          Runs locally offline or with Gemini AI neural intelligence.
         </p>
+
+        {/* 6-Month Plan & Free Trial Highlight Bar */}
+        {onOpenPricing && (
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-indigo-50/80 via-purple-50/80 to-pink-50/80 dark:from-indigo-950/40 dark:via-purple-950/40 dark:to-pink-950/30 border border-indigo-200/80 dark:border-indigo-800/80 text-xs">
+            <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white font-bold text-[10px]">
+              BEST VALUE
+            </span>
+            <span className="text-slate-700 dark:text-slate-300 font-medium">
+              6-Month Plan: <strong>₹299 for 180 days</strong> (Only ₹49.83/mo • Unlimited removals)
+            </span>
+            <button
+              onClick={() => onOpenPricing('plan_sixmonth')}
+              className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5 ml-1"
+            >
+              <span>View Plans</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+            {onOpenBackgroundApi && (
+              <>
+                <span className="text-slate-300 dark:text-slate-700">•</span>
+                <button
+                  onClick={onOpenBackgroundApi}
+                  className="font-bold text-purple-600 dark:text-purple-400 hover:underline"
+                >
+                  Background API
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main Drag & Drop Zone */}

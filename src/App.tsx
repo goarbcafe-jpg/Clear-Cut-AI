@@ -21,6 +21,10 @@ import { ShareModal } from './components/ShareModal';
 import { FeedbackModal, FeedbackEntry } from './components/FeedbackModal';
 import { HelpCenterModal } from './components/HelpCenterModal';
 import { AdminDashboardModal } from './components/AdminDashboardModal';
+import { PricingModal } from './components/PricingModal';
+import { NotificationCenterModal } from './components/NotificationCenterModal';
+import { SubscriptionDashboardModal } from './components/SubscriptionDashboardModal';
+import { BackgroundApiModal } from './components/BackgroundApiModal';
 import { AIStudio } from './components/AIStudio';
 import { ProjectsManager } from './components/ProjectsManager';
 import { ProfileView } from './components/ProfileView';
@@ -33,6 +37,7 @@ import {
   Project,
   ThemeMode,
   User,
+  UserSubscription,
 } from './types';
 import { removeBackgroundLocally } from './utils/aiSegmentation';
 import {
@@ -90,6 +95,16 @@ export default function App() {
   const [showFeedbackModal, setShowFeedbackModal] = useState<boolean>(false);
   const [showHelpCenterModal, setShowHelpCenterModal] = useState<boolean>(false);
   const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
+
+  // Subscriptions & Notifications
+  const [entitlement, setEntitlement] = useState<UserSubscription | null>(null);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
+  const [showPricingModal, setShowPricingModal] = useState<boolean>(false);
+  const [pricingInitialPlan, setPricingInitialPlan] = useState<'plan_monthly' | 'plan_twomonth' | 'plan_sixmonth'>('plan_sixmonth');
+  const [showNotificationModal, setShowNotificationModal] = useState<boolean>(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState<boolean>(false);
+  const [showBackgroundApiModal, setShowBackgroundApiModal] = useState<boolean>(false);
+
   const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>(() => {
     try {
       const stored = localStorage.getItem("auracut_user_feedbacks");
@@ -148,6 +163,32 @@ export default function App() {
 
     // Sync online history
     syncHistory();
+    fetchSubscriptionAndNotifications();
+  }, []);
+
+  const fetchSubscriptionAndNotifications = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('auracut_auth_token');
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+      // 1. Subscription & Entitlement status
+      const subRes = await fetch('/api/subscription/status', { headers });
+      if (subRes.ok) {
+        const data = await subRes.json();
+        if (data.entitlement) {
+          setEntitlement(data.entitlement);
+        }
+      }
+
+      // 2. Notifications count
+      const notifRes = await fetch('/api/notifications', { headers });
+      if (notifRes.ok) {
+        const nData = await notifRes.json();
+        setUnreadNotificationsCount(nData.unreadCount || 0);
+      }
+    } catch (e) {
+      console.warn('Subscription/notifications sync notice:', e);
+    }
   }, []);
 
   // 2. Real-Time Online / Offline Detection & Sync
@@ -638,6 +679,14 @@ export default function App() {
         offlineQueueCount={offlineQueueCount}
         onOpenFeedback={() => setShowFeedbackModal(true)}
         onOpenAdmin={() => setShowAdminModal(true)}
+        unreadCount={unreadNotificationsCount}
+        onOpenNotifications={() => setShowNotificationModal(true)}
+        onOpenPricing={() => {
+          setPricingInitialPlan('plan_sixmonth');
+          setShowPricingModal(true);
+        }}
+        onOpenSubscriptionDashboard={() => setShowSubscriptionModal(true)}
+        entitlement={entitlement}
       />
 
       {/* Main Content Area */}
@@ -650,6 +699,11 @@ export default function App() {
               onSelectSample={handleSelectSample}
               onNavigateTab={setActiveTab}
               onOpenFeedback={() => setShowFeedbackModal(true)}
+              onOpenPricing={(plan) => {
+                if (plan) setPricingInitialPlan(plan);
+                setShowPricingModal(true);
+              }}
+              onOpenBackgroundApi={() => setShowBackgroundApiModal(true)}
             />
 
             {/* Quick Recent Projects bar on Home */}
@@ -887,6 +941,66 @@ export default function App() {
           onDeleteFeedback={(id) => {
             setFeedbacks((prev) => prev.filter((f) => f.id !== id));
             showToast("Review moderated", "info");
+          }}
+        />
+      )}
+
+      {/* GURUCUT AI Pricing & 6-Month Plan Modal */}
+      {showPricingModal && (
+        <PricingModal
+          isOpen={showPricingModal}
+          onClose={() => setShowPricingModal(false)}
+          currentUser={currentUser}
+          entitlement={entitlement}
+          initialSelectedPlanId={pricingInitialPlan}
+          onSubscriptionUpdated={(updated) => {
+            setEntitlement(updated);
+            fetchSubscriptionAndNotifications();
+            showToast(`Activated ${updated.planName}! Unlimited standard background removals unlocked.`, 'success');
+          }}
+          onOpenAuth={() => setShowAuthModal(true)}
+        />
+      )}
+
+      {/* Notifications & Expiry Reminders Center */}
+      {showNotificationModal && (
+        <NotificationCenterModal
+          isOpen={showNotificationModal}
+          onClose={() => setShowNotificationModal(false)}
+          onOpenPricing={(planId) => {
+            if (planId) setPricingInitialPlan(planId);
+            setShowPricingModal(true);
+          }}
+          onNotificationsChanged={fetchSubscriptionAndNotifications}
+        />
+      )}
+
+      {/* Subscription Dashboard Modal */}
+      {showSubscriptionModal && (
+        <SubscriptionDashboardModal
+          isOpen={showSubscriptionModal}
+          onClose={() => setShowSubscriptionModal(false)}
+          currentUser={currentUser}
+          entitlement={entitlement}
+          onOpenPricing={() => {
+            setShowSubscriptionModal(false);
+            setPricingInitialPlan('plan_sixmonth');
+            setShowPricingModal(true);
+          }}
+        />
+      )}
+
+      {/* Background API Playground & Keys Modal */}
+      {showBackgroundApiModal && (
+        <BackgroundApiModal
+          isOpen={showBackgroundApiModal}
+          onClose={() => setShowBackgroundApiModal(false)}
+          currentUser={currentUser}
+          entitlement={entitlement}
+          onOpenPricing={() => {
+            setShowBackgroundApiModal(false);
+            setPricingInitialPlan('plan_sixmonth');
+            setShowPricingModal(true);
           }}
         />
       )}

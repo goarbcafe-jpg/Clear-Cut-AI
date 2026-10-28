@@ -133,3 +133,88 @@ export interface UserStats {
   memberSince: string;
 }
 
+// Subscription & Payment Types for GURUCUT AI
+export type SubscriptionPlanId = 'plan_free_trial' | 'plan_monthly' | 'plan_twomonth' | 'plan_sixmonth';
+
+export interface SubscriptionPlan {
+  id: SubscriptionPlanId;
+  name: string;
+  badge?: string;
+  priceInr: number;
+  monthlyEquivalentInr?: number;
+  durationDays: number;
+  trialLimit: number;
+  unlimitedStandardRemovals: boolean;
+  features: string[];
+  popular?: boolean;
+  active: boolean;
+}
+
+export interface UserSubscription {
+  id: string;
+  userId: string;
+  planId: SubscriptionPlanId;
+  planName: string;
+  status: 'active' | 'expired' | 'trial';
+  startAt: string;
+  expiresAt: string;
+  paymentReference?: string;
+  amountInr: number;
+  unlimitedStandardRemovals: boolean;
+  daysRemaining: number;
+  trialAllowance: number;
+  trialUsed: number;
+  trialRemaining: number;
+  isPremium: boolean;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  userId: string;
+  userEmail?: string;
+  planId: SubscriptionPlanId;
+  planName: string;
+  gateway: string;
+  gatewayOrderId: string;
+  gatewayPaymentId: string;
+  amountInr: number;
+  paymentStatus: 'created' | 'verified' | 'failed';
+  paymentMethod?: string;
+  createdAt: string;
+  verifiedAt?: string;
+}
+
+export interface ApiUsageRecord {
+  id: string;
+  userId: string;
+  provider: string;
+  operation: string;
+  processingStatus: 'success' | 'failed';
+  estimatedCost: number;
+  createdAt: string;
+}
+
+export type NotificationType =
+  | '7_day_reminder'
+  | '3_day_reminder'
+  | '1_day_reminder'
+  | 'expired'
+  | 'after_expiry'
+  | 'renewal_success'
+  | 'trial_welcome'
+  | 'trial_depleted';
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  notificationType: NotificationType;
+  title: string;
+  message: string;
+  actionLabel?: string;
+  actionType?: 'open_pricing' | 'open_editor' | 'none';
+  isRead: boolean;
+  createdAt: string;
+  expiresAt?: string;
+}
+
+
